@@ -1,20 +1,15 @@
 [build]
   publish = "."
 
-[[redirects]]
-  from = "/"
-  to = "/track.html"
-  status = 200
+# Убираем редирект с / на track.html
+# [[redirects]]
+#   from = "/"
+#   to = "/track.html"
+#   status = 200
 
-# Разрешаем доступ к файлам в temp_data
+# Оставляем только CORS для temp_data
 [[headers]]
   for = "/temp_data/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
     Cache-Control = "public, max-age=3600"
-
-# Убираем кэширование для JSON файлов (чтобы всегда были свежие данные)
-[[headers]]
-  for = "/temp_data/*.json"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
