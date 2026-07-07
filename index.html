@@ -143,7 +143,6 @@
             background: rgba(60, 60, 60, 0.95) !important;
         }
 
-        /* ===== ИНФО-ПАНЕЛЬ - ОДНА СТРОКА, НОРМАЛЬНЫЙ РАЗМЕР ===== */
         #info-panel {
             position: absolute;
             top: 8px;
@@ -195,7 +194,6 @@
             flex-shrink: 0;
         }
 
-        /* Телефоны */
         @media (max-width: 600px) {
             #info-panel {
                 padding: 4px 10px;
@@ -243,7 +241,6 @@
             }
         }
 
-        /* Очень маленькие телефоны */
         @media (max-width: 400px) {
             #info-panel {
                 padding: 3px 6px;
@@ -428,7 +425,6 @@
             border-top: 1px solid #444;
         }
 
-        /* Toast-уведомление */
         #copyToast {
             position: fixed;
             bottom: 100px;
@@ -546,7 +542,6 @@
     </div>
 
     <script>
-        // Функция копирования в буфер обмена
         function copyToClipboard(text) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).catch(function() {
@@ -624,9 +619,10 @@
             }
         }
 
+        // ⭐ ГЛАВНОЕ ИЗМЕНЕНИЕ: загружаем с GitHub
         async function loadPointsFromFile(fileId) {
             try {
-                const response = await fetch(`https://stratosystems-track.netlify.app/temp_data/${fileId}.json`);
+                const response = await fetch(`https://raw.githubusercontent.com/galkevich-888/stratosystems-track/main/temp_data/${fileId}.json`);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
@@ -709,7 +705,6 @@
                 attribution: ''
             }).addTo(map);
 
-            // Кнопки зума
             const zoomIn = document.createElement('div');
             zoomIn.className = 'leaflet-control-zoom-in';
             zoomIn.innerHTML = '+';
@@ -780,7 +775,6 @@
             zoomContainer.appendChild(zoomOut);
             document.getElementById('map').appendChild(zoomContainer);
 
-            // Кнопка автозума
             const homeBtn = document.createElement('div');
             homeBtn.className = 'custom-zoom-home';
             homeBtn.innerHTML = '⌖';
@@ -885,7 +879,6 @@
                     closeButton: true
                 });
 
-                // Обработчик клика по координатам в попапе
                 marker.on('popupopen', function() {
                     setTimeout(function() {
                         const coordsEl = document.querySelector('.popup-coords');
