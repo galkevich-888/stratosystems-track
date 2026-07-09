@@ -578,6 +578,7 @@
             }, 1500);
         }
 
+        // ФИКС: Декомпрессия с поддержкой date и course
         function decompressPoints(encodedData) {
             try {
                 const base64 = encodedData.replace(/-/g, '+').replace(/_/g, '/');
@@ -591,22 +592,38 @@
                 const compact = JSON.parse(decompressed);
 
                 const points = compact.map(row => {
-                    const point = { lat: row[0], lon: row[1] };
+                    const point = {
+                        lat: row[0],
+                        lon: row[1]
+                    };
 
+                    // Время (row[2])
                     if (row.length > 2 && row[2] > 0) {
                         const seconds = row[2];
                         const hours = Math.floor(seconds / 3600);
                         const minutes = Math.floor((seconds % 3600) / 60);
                         const secs = seconds % 60;
-                        point.time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                        point.time = String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
                     }
 
+                    // Высота (row[3])
                     if (row.length > 3 && row[3] > 0) {
                         point.alt = row[3];
                     }
 
+                    // Скорость (row[4])
                     if (row.length > 4) {
                         point.speed = row[4];
+                    }
+
+                    // ДАТА (row[5]) — ФИКС!
+                    if (row.length > 5 && row[5]) {
+                        point.date = row[5];
+                    }
+
+                    // КУРС (row[6]) — ФИКС!
+                    if (row.length > 6 && row[6]) {
+                        point.course = row[6];
                     }
 
                     return point;
@@ -622,9 +639,9 @@
         async function loadPointsFromFile(fileId) {
             try {
                 const cleanId = fileId.replace(/\.json$/, '');
-                const response = await fetch(`https://raw.githubusercontent.com/galkevich-888/stratosystems-track/main/temp_data/${cleanId}.json`);
+                const response = await fetch('https://raw.githubusercontent.com/galkevich-888/stratosystems-track/main/temp_data/' + cleanId + '.json');
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error('HTTP ' + response.status);
                 }
                 const data = await response.json();
 
@@ -667,25 +684,26 @@
 
             document.getElementById('loader').style.display = 'none';
 
-            let dist = 0;
-            for (let i = 1; i < points.length; i++) {
-                dist += haversineDistance(points[i-1], points[i]);
+            // Статистика по ВСЕМ точкам
+            var totalDist = 0;
+            for (var i = 1; i < points.length; i++) {
+                totalDist += haversineDistance(points[i-1], points[i]);
             }
             document.getElementById('pointsCount').textContent = points.length;
-            document.getElementById('distanceInfo').textContent = dist.toFixed(1) + ' км';
+            document.getElementById('distanceInfo').textContent = totalDist.toFixed(1) + ' км';
 
-            let sec = 0;
+            var totalSec = 0;
             if (points[0].time && points[points.length-1].time) {
                 try {
-                    const t1 = points[0].time.split(':').map(Number);
-                    const t2 = points[points.length-1].time.split(':').map(Number);
-                    sec = (t2[0]*3600+t2[1]*60+t2[2]) - (t1[0]*3600+t1[1]*60+t1[2]);
-                } catch(e) { sec = (points.length-1)*600; }
-            } else { sec = (points.length-1)*600; }
-            document.getElementById('timeInfo').textContent = formatDuration(Math.max(0, sec)) + ' MSK';
+                    var t1 = points[0].time.split(':').map(Number);
+                    var t2 = points[points.length-1].time.split(':').map(Number);
+                    totalSec = (t2[0]*3600+t2[1]*60+t2[2]) - (t1[0]*3600+t1[1]*60+t1[2]);
+                } catch(e) { totalSec = (points.length-1)*600; }
+            } else { totalSec = (points.length-1)*600; }
+            document.getElementById('timeInfo').textContent = formatDuration(Math.max(0, totalSec)) + ' MSK';
 
-            let minAlt = Infinity, maxAlt = -Infinity, hasAlt = false;
-            points.forEach(p => {
+            var minAlt = Infinity, maxAlt = -Infinity, hasAlt = false;
+            points.forEach(function(p) {
                 if (p.alt !== undefined && p.alt !== null && !isNaN(p.alt)) {
                     hasAlt = true;
                     if (p.alt < minAlt) minAlt = p.alt;
@@ -694,22 +712,23 @@
             });
             document.getElementById('altitudeInfo').textContent = hasAlt ? (maxAlt - minAlt).toFixed(0) + ' м' : '—';
 
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            const MAX_MARKERS = isMobile ? 250 : 800;
+            // Оптимизация для мобильных
+            var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            var MAX_MARKERS = isMobile ? 250 : 800;
 
-            let displayPoints = points;
+            var displayPoints = points;
             if (points.length > MAX_MARKERS) {
-                const step = Math.ceil(points.length / MAX_MARKERS);
+                var step = Math.ceil(points.length / MAX_MARKERS);
                 displayPoints = [];
-                for (let i = 0; i < points.length; i += step) {
-                    displayPoints.push(points[i]);
+                for (var j = 0; j < points.length; j += step) {
+                    displayPoints.push(points[j]);
                 }
-                if (!displayPoints.includes(points[0])) displayPoints.unshift(points[0]);
-                if (!displayPoints.includes(points[points.length-1])) displayPoints.push(points[points.length-1]);
+                if (displayPoints.indexOf(points[0]) === -1) displayPoints.unshift(points[0]);
+                if (displayPoints.indexOf(points[points.length-1]) === -1) displayPoints.push(points[points.length-1]);
                 console.log('Отображаем ' + displayPoints.length + ' маркеров из ' + points.length);
             }
 
-            const map = L.map('map', {
+            var map = L.map('map', {
                 center: [displayPoints[0].lat, displayPoints[0].lon],
                 zoom: 12,
                 zoomControl: false,
@@ -724,94 +743,67 @@
                 attribution: ''
             }).addTo(map);
 
-            const zoomIn = document.createElement('div');
+            // Кастомные кнопки зума
+            var zoomIn = document.createElement('div');
             zoomIn.className = 'leaflet-control-zoom-in';
             zoomIn.innerHTML = '+';
-            zoomIn.style.cssText = `
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                width: 38px !important;
-                height: 38px !important;
-                background: rgba(30, 30, 30, 0.9) !important;
-                color: #e0e0e0 !important;
-                border: 1px solid rgba(255,255,255,0.08) !important;
-                backdrop-filter: blur(8px) !important;
-                -webkit-backdrop-filter: blur(8px) !important;
-                border-radius: 8px 8px 0 0 !important;
-                font-size: 20px !important;
-                font-weight: 300 !important;
-                cursor: pointer !important;
-                user-select: none !important;
-                -webkit-user-select: none !important;
-                transition: background 0.2s !important;
-            `;
-            zoomIn.onclick = () => map.zoomIn();
-            zoomIn.onmouseover = () => zoomIn.style.background = 'rgba(60, 60, 60, 0.95)';
-            zoomIn.onmouseout = () => zoomIn.style.background = 'rgba(30, 30, 30, 0.9)';
+            zoomIn.style.cssText =
+                'display: flex !important; align-items: center !important; justify-content: center !important; ' +
+                'width: 38px !important; height: 38px !important; background: rgba(30,30,30,0.9) !important; ' +
+                'color: #e0e0e0 !important; border: 1px solid rgba(255,255,255,0.08) !important; ' +
+                'backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; ' +
+                'border-radius: 8px 8px 0 0 !important; font-size: 20px !important; font-weight: 300 !important; ' +
+                'cursor: pointer !important; user-select: none !important; -webkit-user-select: none !important; ' +
+                'transition: background 0.2s !important;';
+            zoomIn.onclick = function() { map.zoomIn(); };
+            zoomIn.onmouseover = function() { zoomIn.style.background = 'rgba(60,60,60,0.95)'; };
+            zoomIn.onmouseout = function() { zoomIn.style.background = 'rgba(30,30,30,0.9)'; };
 
-            const zoomOut = document.createElement('div');
+            var zoomOut = document.createElement('div');
             zoomOut.className = 'leaflet-control-zoom-out';
             zoomOut.innerHTML = '−';
-            zoomOut.style.cssText = `
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                width: 38px !important;
-                height: 38px !important;
-                background: rgba(30, 30, 30, 0.9) !important;
-                color: #e0e0e0 !important;
-                border: 1px solid rgba(255,255,255,0.08) !important;
-                border-top: none !important;
-                backdrop-filter: blur(8px) !important;
-                -webkit-backdrop-filter: blur(8px) !important;
-                border-radius: 0 0 8px 8px !important;
-                font-size: 20px !important;
-                font-weight: 300 !important;
-                cursor: pointer !important;
-                user-select: none !important;
-                -webkit-user-select: none !important;
-                transition: background 0.2s !important;
-            `;
-            zoomOut.onclick = () => map.zoomOut();
-            zoomOut.onmouseover = () => zoomOut.style.background = 'rgba(60, 60, 60, 0.95)';
-            zoomOut.onmouseout = () => zoomOut.style.background = 'rgba(30, 30, 30, 0.9)';
+            zoomOut.style.cssText =
+                'display: flex !important; align-items: center !important; justify-content: center !important; ' +
+                'width: 38px !important; height: 38px !important; background: rgba(30,30,30,0.9) !important; ' +
+                'color: #e0e0e0 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-top: none !important; ' +
+                'backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; ' +
+                'border-radius: 0 0 8px 8px !important; font-size: 20px !important; font-weight: 300 !important; ' +
+                'cursor: pointer !important; user-select: none !important; -webkit-user-select: none !important; ' +
+                'transition: background 0.2s !important;';
+            zoomOut.onclick = function() { map.zoomOut(); };
+            zoomOut.onmouseover = function() { zoomOut.style.background = 'rgba(60,60,60,0.95)'; };
+            zoomOut.onmouseout = function() { zoomOut.style.background = 'rgba(30,30,30,0.9)'; };
 
-            const zoomContainer = document.createElement('div');
+            var zoomContainer = document.createElement('div');
             zoomContainer.className = 'leaflet-control-zoom';
-            zoomContainer.style.cssText = `
-                position: absolute !important;
-                bottom: 70px !important;
-                right: 10px !important;
-                z-index: 1000 !important;
-                display: flex !important;
-                flex-direction: column !important;
-                border-radius: 8px !important;
-                overflow: hidden !important;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.25) !important;
-            `;
+            zoomContainer.style.cssText =
+                'position: absolute !important; bottom: 70px !important; right: 10px !important; ' +
+                'z-index: 1000 !important; display: flex !important; flex-direction: column !important; ' +
+                'border-radius: 8px !important; overflow: hidden !important; ' +
+                'box-shadow: 0 2px 10px rgba(0,0,0,0.25) !important;';
             zoomContainer.appendChild(zoomIn);
             zoomContainer.appendChild(zoomOut);
             document.getElementById('map').appendChild(zoomContainer);
 
-            const homeBtn = document.createElement('div');
+            // Кнопка "Показать весь трек"
+            var homeBtn = document.createElement('div');
             homeBtn.className = 'custom-zoom-home';
             homeBtn.innerHTML = '⌖';
             homeBtn.title = 'Показать весь трек';
-            homeBtn.onclick = () => {
+            homeBtn.onclick = function() {
                 if (displayPoints.length > 1) {
-                    const coords = displayPoints.map(p => [p.lat, p.lon]);
+                    var coords = displayPoints.map(function(p) { return [p.lat, p.lon]; });
                     map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
                 }
             };
             document.getElementById('map').appendChild(homeBtn);
 
             function updateButtonsForMobile() {
-                const isMobile = window.innerWidth <= 600;
-                const size = isMobile ? '32px' : '38px';
-                const fontSize = isMobile ? '16px' : '20px';
-                const bottomPos = isMobile ? '64px' : '70px';
-                const rightPos = isMobile ? '8px' : '10px';
+                var isMobile = window.innerWidth <= 600;
+                var size = isMobile ? '32px' : '38px';
+                var fontSize = isMobile ? '16px' : '20px';
+                var bottomPos = isMobile ? '64px' : '70px';
+                var rightPos = isMobile ? '8px' : '10px';
 
                 zoomContainer.style.bottom = bottomPos;
                 zoomContainer.style.right = rightPos;
@@ -830,18 +822,19 @@
             updateButtonsForMobile();
             window.addEventListener('resize', updateButtonsForMobile);
 
+            // Масштабная линейка
             function updateScaleBar() {
-                const distSpan = document.getElementById('scaleDistance');
+                var distSpan = document.getElementById('scaleDistance');
                 if (!distSpan) return;
-                const PIXEL_WIDTH = 60;
-                const point1 = L.point(0, 0);
-                const point2 = L.point(PIXEL_WIDTH, 0);
-                const latLng1 = map.containerPointToLatLng(point1);
-                const latLng2 = map.containerPointToLatLng(point2);
-                const distance = latLng1.distanceTo(latLng2);
-                let text = '';
+                var PIXEL_WIDTH = 60;
+                var point1 = L.point(0, 0);
+                var point2 = L.point(PIXEL_WIDTH, 0);
+                var latLng1 = map.containerPointToLatLng(point1);
+                var latLng2 = map.containerPointToLatLng(point2);
+                var distance = latLng1.distanceTo(latLng2);
+                var text = '';
                 if (distance >= 1000) {
-                    const km = distance / 1000;
+                    var km = distance / 1000;
                     if (km >= 10) text = km.toFixed(0) + ' км';
                     else if (km >= 1) text = km.toFixed(1) + ' км';
                     else text = km.toFixed(2) + ' км';
@@ -853,22 +846,25 @@
             map.on('moveend zoomend', updateScaleBar);
             setTimeout(updateScaleBar, 500);
 
-            const coords = displayPoints.map(p => [p.lat, p.lon]);
-            L.polyline(coords, { color: '#4FC3F7', weight: 3, opacity: 0.8 }).addTo(map);
+            // Линия трека (используем displayPoints)
+            var coordsLine = displayPoints.map(function(p) { return [p.lat, p.lon]; });
+            L.polyline(coordsLine, { color: '#4FC3F7', weight: 3, opacity: 0.8 }).addTo(map);
 
+            // Логотип
             L.control({ position: 'bottomleft' }).onAdd = function() {
-                const div = L.DomUtil.create('div', 'logo-control');
+                var div = L.DomUtil.create('div', 'logo-control');
                 div.innerHTML = '<span class="logo-text">ИЦ Стратосферные системы</span>';
                 return div;
             }.bind(this).call(map);
 
-            displayPoints.forEach((p, i) => {
-                const isStart = (p === displayPoints[0]);
-                const isFinish = (p === displayPoints[displayPoints.length - 1]);
-                const originalIndex = points.indexOf(p);
-                const num = originalIndex + 1;
+            // Маркеры (только для displayPoints)
+            displayPoints.forEach(function(p, index) {
+                var isStart = (p === displayPoints[0]);
+                var isFinish = (p === displayPoints[displayPoints.length - 1]);
+                var originalIndex = points.indexOf(p);
+                var num = originalIndex + 1;
 
-                const marker = L.marker([p.lat, p.lon], {
+                var marker = L.marker([p.lat, p.lon], {
                     icon: L.divIcon({
                         className: 'point-marker',
                         html: '<div class="marker-inner ' + (isStart ? 'start' : isFinish ? 'finish' : '') + '">' + num + '</div>',
@@ -877,12 +873,13 @@
                     })
                 }).addTo(map);
 
-                const coordStr = p.lat.toFixed(6) + ', ' + p.lon.toFixed(6);
+                var coordStr = p.lat.toFixed(6) + ', ' + p.lon.toFixed(6);
 
-                let html = '<div class="popup-inner">';
+                var html = '<div class="popup-inner">';
                 html += '<div class="popup-title ' + (isStart ? 'start' : isFinish ? 'finish' : '') + '">' + (isStart ? 'Старт' : isFinish ? 'Финиш' : 'Точка ' + num) + '</div>';
                 html += '<div class="popup-coords" data-coords="' + coordStr + '">' + coordStr + '<span class="copy-hint"> copy</span></div>';
 
+                // ДАТА И ВРЕМЯ
                 if (p.date && p.time) {
                     html += '<div class="popup-row"><span class="label">Дата/время</span><span class="value">' + p.date + ' ' + p.time + ' MSK</span></div>';
                 } else if (p.time) {
@@ -895,6 +892,7 @@
                 if (p.speed !== undefined && p.speed !== null && !isNaN(p.speed)) {
                     html += '<div class="popup-row"><span class="label">Скорость</span><span class="value">' + p.speed.toFixed(1) + ' км/ч</span></div>';
                 }
+                // КУРС
                 if (p.course) {
                     html += '<div class="popup-row"><span class="label">Курс</span><span class="value">' + p.course + '</span></div>';
                 }
