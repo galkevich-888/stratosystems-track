@@ -619,10 +619,12 @@
             }
         }
 
-        // ⭐ ГЛАВНОЕ ИЗМЕНЕНИЕ: загружаем с GitHub
+        // ⭐ ИСПРАВЛЕННАЯ ФУНКЦИЯ: убираем .json если есть
         async function loadPointsFromFile(fileId) {
             try {
-                const response = await fetch(`https://raw.githubusercontent.com/galkevich-888/stratosystems-track/main/temp_data/${fileId}.json`);
+                // Убираем .json если он есть (на случай если передали с расширением)
+                const cleanId = fileId.replace(/\.json$/, '');
+                const response = await fetch(`https://raw.githubusercontent.com/galkevich-888/stratosystems-track/main/temp_data/${cleanId}.json`);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
