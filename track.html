@@ -2,34 +2,18 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Трек стратостата</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        /* УСКОРЕНИЕ ДЛЯ ANDROID */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            will-change: transform;
-            -webkit-transform: translateZ(0);
-            transform: translateZ(0);
         }
-
-        /* Ограничиваем will-change только для нужных элементов, чтобы не перегружать */
-        .leaflet-container,
-        .leaflet-pane,
-        .leaflet-tile-pane,
-        .leaflet-marker-pane,
-        .leaflet-popup-pane {
-            will-change: transform;
-            -webkit-transform: translateZ(0);
-            transform: translateZ(0);
-        }
-
         html, body, #map {
             width: 100%;
             height: 100%;
@@ -484,33 +468,12 @@
             border: 2px solid #fff;
             box-shadow: 0 2px 8px rgba(0,0,0,0.35);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            will-change: transform;
-            -webkit-transform: translateZ(0);
-            transform: translateZ(0);
         }
         .point-marker .marker-inner.start {
             background: #66BB6A;
         }
         .point-marker .marker-inner.finish {
             background: #EF5350;
-        }
-
-        /* На мобильных уменьшаем маркеры */
-        @media (max-width: 600px) {
-            .point-marker .marker-inner {
-                width: 20px;
-                height: 20px;
-                font-size: 8px;
-                border-width: 1.5px;
-            }
-        }
-        @media (max-width: 400px) {
-            .point-marker .marker-inner {
-                width: 18px;
-                height: 18px;
-                font-size: 7px;
-                border-width: 1px;
-            }
         }
 
         .logo-control {
@@ -646,10 +609,12 @@
                         point.speed = row[4];
                     }
 
+                    // ДАТА (индекс 5)
                     if (row.length > 5 && row[5]) {
                         point.date = row[5];
                     }
 
+                    // КУРС (индекс 6)
                     if (row.length > 6 && row[6]) {
                         point.course = row[6];
                     }
@@ -702,52 +667,6 @@
             return h + ':' + m;
         }
 
-        function buildPopupHTML(p, i, isStart, isFinish) {
-            const num = i + 1;
-            const coordStr = `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`;
-
-            function formatCourse(course) {
-                if (!course) return null;
-                const num = parseFloat(course);
-                if (!isNaN(num)) {
-                    const dirs = ['С', 'СВ', 'В', 'ЮВ', 'Ю', 'ЮЗ', 'З', 'СЗ'];
-                    const idx = Math.round(num / 45) % 8;
-                    return dirs[idx] + ' (' + Math.round(num) + '°)';
-                }
-                if (typeof course === 'string' && course.includes('°')) {
-                    return course;
-                }
-                return String(course);
-            }
-
-            let html = `<div class="popup-inner">`;
-            html += `<div class="popup-title ${isStart ? 'start' : isFinish ? 'finish' : ''}">${isStart ? 'Старт' : isFinish ? 'Финиш' : 'Точка ' + num}</div>`;
-            html += `<div class="popup-coords" data-coords="${coordStr}">${coordStr}<span class="copy-hint"> copy</span></div>`;
-
-            if (p.date) {
-                html += `<div class="popup-row"><span class="label">Дата</span><span class="value">${p.date}</span></div>`;
-            }
-            if (p.time) {
-                html += `<div class="popup-row"><span class="label">Время</span><span class="value">${p.time} MSK</span></div>`;
-            }
-            if (p.alt !== undefined && p.alt !== null && !isNaN(p.alt) && p.alt > 0) {
-                html += `<div class="popup-row"><span class="label">Высота</span><span class="value">${p.alt} м</span></div>`;
-            }
-            if (p.speed !== undefined && p.speed !== null && !isNaN(p.speed)) {
-                html += `<div class="popup-row"><span class="label">Скорость</span><span class="value">${p.speed.toFixed(1)} км/ч</span></div>`;
-            }
-            if (p.course) {
-                const courseDisplay = formatCourse(p.course);
-                if (courseDisplay) {
-                    html += `<div class="popup-row"><span class="label">Курс</span><span class="value">${courseDisplay}</span></div>`;
-                }
-            }
-
-            html += `<div class="popup-footer">ИЦ Стратосферные системы</div>`;
-            html += `</div>`;
-            return html;
-        }
-
         function renderMap(points) {
             if (!points || points.length === 0) {
                 document.getElementById('loader').style.display = 'none';
@@ -796,7 +715,6 @@
                 attribution: ''
             }).addTo(map);
 
-            // === КАСТОМНЫЙ ZOOM CONTROL ===
             const zoomIn = document.createElement('div');
             zoomIn.className = 'leaflet-control-zoom-in';
             zoomIn.innerHTML = '+';
@@ -926,112 +844,112 @@
             map.on('moveend zoomend', updateScaleBar);
             setTimeout(updateScaleBar, 500);
 
-            // === ПОЛИЛИНИЯ ===
             const coords = points.map(p => [p.lat, p.lon]);
             L.polyline(coords, { color: '#4FC3F7', weight: 3, opacity: 0.8 }).addTo(map);
 
-            // === ЛОГОТИП ===
             L.control({ position: 'bottomleft' }).onAdd = function() {
                 const div = L.DomUtil.create('div', 'logo-control');
                 div.innerHTML = '<span class="logo-text">ИЦ Стратосферные системы</span>';
                 return div;
             }.bind(this).call(map);
 
-            // === ОПТИМИЗИРОВАННОЕ ДОБАВЛЕНИЕ МАРКЕРОВ (БАТЧИНГ) ===
-            const BATCH_SIZE = 50; // Маркеров за один раз
-            const BATCH_DELAY = 10; // Мс между пачками
-            let markerIndex = 0;
-
-            // Определяем размер маркера в зависимости от экрана
-            const isMobile = window.innerWidth <= 600;
-            const markerSize = isMobile ? 20 : 24;
-            const markerFontSize = isMobile ? 8 : 10;
-            const borderWidth = isMobile ? 1.5 : 2;
-
-            // Флаг для отслеживания завершения
-            let allMarkersAdded = false;
-
-            function addMarkerBatch() {
-                const start = markerIndex;
-                const end = Math.min(markerIndex + BATCH_SIZE, points.length);
-
-                for (let i = start; i < end; i++) {
-                    const p = points[i];
-                    const isStart = i === 0;
-                    const isFinish = i === points.length - 1;
-                    const num = i + 1;
-
-                    // Создаём HTML для маркера с учётом размера
-                    const markerHtml = `<div class="marker-inner ${isStart ? 'start' : isFinish ? 'finish' : ''}" style="width:${markerSize}px;height:${markerSize}px;font-size:${markerFontSize}px;border-width:${borderWidth}px;">${num}</div>`;
-
-                    const marker = L.marker([p.lat, p.lon], {
-                        icon: L.divIcon({
-                            className: 'point-marker',
-                            html: markerHtml,
-                            iconSize: [markerSize, markerSize],
-                            iconAnchor: [markerSize/2, markerSize/2]
-                        })
-                    }).addTo(map);
-
-                    // Попап создаём только при клике (ленивый)
-                    marker.on('click', function() {
-                        if (!this._popup) {
-                            const isStart = i === 0;
-                            const isFinish = i === points.length - 1;
-                            const html = buildPopupHTML(p, i, isStart, isFinish);
-                            this.bindPopup(html, {
-                                className: 'custom-popup',
-                                closeButton: true
-                            });
-
-                            // После открытия попапа добавляем обработчик для копирования
-                            this.on('popupopen', function() {
-                                setTimeout(function() {
-                                    const coordsEl = document.querySelector('.popup-coords');
-                                    if (coordsEl) {
-                                        coordsEl.onclick = function(e) {
-                                            e.stopPropagation();
-                                            const text = this.getAttribute('data-coords') || this.textContent.trim();
-                                            copyToClipboard(text);
-                                            this.classList.add('copied');
-                                            showToast('Координаты скопированы');
-                                            setTimeout(() => {
-                                                this.classList.remove('copied');
-                                            }, 1500);
-                                        };
-                                    }
-                                }, 50);
-                            });
-                        }
-                        this.openPopup();
-                    });
-
-                    markerIndex++;
+            // Функция для форматирования курса
+            function formatCourse(course) {
+                if (!course) return null;
+                // Если это число или строка с числом
+                const num = parseFloat(course);
+                if (!isNaN(num)) {
+                    const dirs = ['С', 'СВ', 'В', 'ЮВ', 'Ю', 'ЮЗ', 'З', 'СЗ'];
+                    const idx = Math.round(num / 45) % 8;
+                    return dirs[idx] + ' (' + Math.round(num) + '°)';
                 }
-
-                if (markerIndex < points.length) {
-                    // Продолжаем батчинг с задержкой
-                    setTimeout(addMarkerBatch, BATCH_DELAY);
-                } else {
-                    allMarkersAdded = true;
-                    // Финальная подгонка карты
-                    if (points.length > 1) {
-                        setTimeout(() => {
-                            map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
-                        }, 100);
-                    }
+                // Если уже отформатировано (например "С (45°)")
+                if (typeof course === 'string' && course.includes('°')) {
+                    return course;
                 }
+                return String(course);
             }
 
-            // Запускаем батчинг
-            addMarkerBatch();
+            points.forEach((p, i) => {
+                const isStart = i === 0;
+                const isFinish = i === points.length - 1;
+                const num = i + 1;
 
-            // Показываем сразу карту, даже если маркеры ещё грузятся
-            setTimeout(() => {
-                if (points.length > 1 && !allMarkersAdded) {
-                    map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
+                const marker = L.marker([p.lat, p.lon], {
+                    icon: L.divIcon({
+                        className: 'point-marker',
+                        html: `<div class="marker-inner ${isStart ? 'start' : isFinish ? 'finish' : ''}">${num}</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                }).addTo(map);
+
+                const coordStr = `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`;
+
+                let html = `<div class="popup-inner">`;
+                html += `<div class="popup-title ${isStart ? 'start' : isFinish ? 'finish' : ''}">${isStart ? 'Старт' : isFinish ? 'Финиш' : 'Точка ' + num}</div>`;
+                html += `<div class="popup-coords" data-coords="${coordStr}">${coordStr}<span class="copy-hint"> copy</span></div>`;
+
+                // ДАТА
+                if (p.date) {
+                    html += `<div class="popup-row"><span class="label">Дата</span><span class="value">${p.date}</span></div>`;
                 }
-            }, 500);
+
+                // ВРЕМЯ
+                if (p.time) {
+                    html += `<div class="popup-row"><span class="label">Время</span><span class="value">${p.time} MSK</span></div>`;
+                }
+
+                // ВЫСОТА
+                if (p.alt !== undefined && p.alt !== null && !isNaN(p.alt) && p.alt > 0) {
+                    html += `<div class="popup-row"><span class="label">Высота</span><span class="value">${p.alt} м</span></div>`;
+                }
+
+                // СКОРОСТЬ
+                if (p.speed !== undefined && p.speed !== null && !isNaN(p.speed)) {
+                    html += `<div class="popup-row"><span class="label">Скорость</span><span class="value">${p.speed.toFixed(1)} км/ч</span></div>`;
+                }
+
+                // КУРС - добавлен
+                if (p.course) {
+                    const courseDisplay = formatCourse(p.course);
+                    if (courseDisplay) {
+                        html += `<div class="popup-row"><span class="label">Курс</span><span class="value">${courseDisplay}</span></div>`;
+                    }
+                }
+
+                html += `<div class="popup-footer">ИЦ Стратосферные системы</div>`;
+                html += `</div>`;
+
+                marker.bindPopup(html, {
+                    className: 'custom-popup',
+                    closeButton: true
+                });
+
+                marker.on('popupopen', function() {
+                    setTimeout(function() {
+                        const coordsEl = document.querySelector('.popup-coords');
+                        if (coordsEl) {
+                            coordsEl.onclick = function(e) {
+                                e.stopPropagation();
+                                const text = this.getAttribute('data-coords') || this.textContent.trim();
+                                copyToClipboard(text);
+                                this.classList.add('copied');
+                                showToast('Координаты скопированы');
+                                setTimeout(() => {
+                                    this.classList.remove('copied');
+                                }, 1500);
+                            };
+                        }
+                    }, 50);
+                });
+            });
+
+            if (points.length > 1) {
+                setTimeout(() => {
+                    map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
+                }, 100);
+            }
         }
 
         async function initMap() {
